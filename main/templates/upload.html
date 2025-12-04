@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Генерація піксель-арту</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/upload.css' %}">
+</head>
+<body>
+    <h1>Генерація піксель-арту</h1>
+
+    {% if error_message %}
+        <p class="error">{{ error_message }}</p>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.original_name }}
+
+        <div class="top-row">
+            <div class="preview-column">
+                <div class="preview-box">
+                    <img
+                        id="original-preview"
+                        src="{% if file_url %}{{ file_url }}{% endif %}"
+                        alt="Оригінальне зображення"
+                        class="preview-image {% if not file_url %}hidden{% endif %}"
+                    >
+                    <span
+                        id="original-placeholder"
+                        class="{% if file_url %}hidden{% endif %}"
+                    >
+                        Обране зображення
+                    </span>
+                </div>
+                <div class="caption">
+                    Оригінал:
+                    {% if current_file %}
+                        <strong>{{ current_file }}</strong>
+                    {% else %}
+                        <span></span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="center-column">
+                <div class="processing-text">Обробка...</div>
+                <div class="dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+                <button type="submit" class="btn-main">Форматувати</button>
+            </div>
+
+            <div class="preview-column">
+                <div class="preview-box">
+                    {% if pixel_url %}
+                        <img src="{{ pixel_url }}" alt="Піксель-арт" class="preview-image pixelated">
+                    {% else %}
+                        <span>Вивід результату</span>
+                    {% endif %}
+                </div>
+                <div class="caption">
+                    Піксель-арт версія:
+                    {% if pixel_url %}
+                        <strong>{{ current_file }}</strong>
+                    {% else %}
+                        <span></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок параметрів + праворуч кнопка з котами -->
+        <div class="controls-block">
+            <div class="controls-left">
+                <div class="form-row file-row">
+                    {% if current_file %}
+                        <span class="section-title">Поточний файл:</span>
+                        <strong>{{ current_file }}</strong>
+                        <label for="id_file" class="file-link">Змінити файл</label>
+                        {{ form.file }}
+                    {% else %}
+                        {{ form.file.label_tag }}
+                        {{ form.file }}
+                    {% endif %}
+                </div>
+
+                <div class="form-row">
+                    <span class="section-title">Кількість "пікселів" по ширині:</span>
+                    {{ form.pixels }}
+                </div>
+
+                <div class="form-row">
+                    <span class="section-title">Масштаб збільшення:</span>
+                    {{ form.scale }}
+                </div>
+
+                <div class="form-row resize-row">
+                    <span class="section-title">Зміна розміру:</span>
+                    <div class="resize-inputs">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="resize_toggle">
+                        </label>
+
+                        <span class="resize-label">висота</span>
+                        {{ form.output_height }}
+                        <span>×</span>
+                        <span class="resize-label">ширина</span>
+                        {{ form.output_width }}
+                    </div>
+                </div>
+
+                <div class="form-row keep-aspect-row">
+                    <span class="section-title"></span>
+                    <label class="checkbox-label">
+                        {{ form.keep_aspect }}
+                        {{ form.keep_aspect.label }}
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <span class="section-title">Кольоровий фільтр:</span>
+                    <label class="checkbox-label">
+                        {{ form.apply_color }}
+                        {{ form.apply_color.label }}
+                    </label>
+                </div>
+
+                <div class="form-row color-mode-row">
+                    <span class="section-title">Кольорова гамма:</span>
+                    {{ form.color_mode }}
+                </div>
+            </div>
+
+            <div class="controls-right">
+                <div class="download-block">
+                    {% if pixel_url %}
+                        <a href="{{ pixel_url }}" class="btn-download" download>Завантажити</a>
+                    {% else %}
+                        <div class="btn-download btn-download-disabled">Завантажити</div>
+                    {% endif %}
+
+                    <div class="mini-previews">
+                        <img src="{% static 'img/cat.jpg' %}" alt="Кіт оригінал">
+                        <span class="arrow">→</span>
+                        <img src="{% static 'img/pixel_cat.jpg' %}" alt="Кіт піксель-арт" class="pixelated">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="back-link">
+        <a href="/">На головну</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const fileInput = document.getElementById('id_file');
+            const originalPreview = document.getElementById('original-preview');
+            const originalPlaceholder = document.getElementById('original-placeholder');
+
+            if (fileInput && originalPreview && originalPlaceholder) {
+                fileInput.addEventListener('change', function () {
+                    const file = this.files && this.files[0];
+                    if (!file) return;
+
+                    const url = URL.createObjectURL(file);
+                    originalPreview.src = url;
+                    originalPreview.style.display = 'block';
+                    originalPlaceholder.style.display = 'none';
+                });
+            }
+
+            const widthInput = document.getElementById('id_output_width');
+            const heightInput = document.getElementById('id_output_height');
+            const keepAspect = document.getElementById('id_keep_aspect');
+
+            let ratio = null;
+
+            function initRatio() {
+                if (!widthInput || !heightInput) return;
+                const w = parseInt(widthInput.value);
+                const h = parseInt(heightInput.value);
+                if (w > 0 && h > 0) {
+                    ratio = h / w;
+                }
+            }
+
+            function updateRatio() {
+                if (!widthInput || !heightInput) return;
+                const w = parseInt(widthInput.value);
+                const h = parseInt(heightInput.value);
+                if (w > 0 && h > 0) {
+                    ratio = h / w;
+                }
+            }
+
+            if (widthInput && heightInput) {
+                initRatio();
+
+                widthInput.addEventListener('input', function () {
+                    const w = parseInt(widthInput.value);
+                    if (!keepAspect || !keepAspect.checked) {
+                        updateRatio();
+                        return;
+                    }
+                    if (ratio && w > 0) {
+                        const newH = Math.round(w * ratio);
+                        heightInput.value = newH;
+                    }
+                });
+
+                heightInput.addEventListener('input', function () {
+                    const h = parseInt(heightInput.value);
+                    if (!keepAspect || !keepAspect.checked) {
+                        updateRatio();
+                        return;
+                    }
+                    if (ratio && h > 0) {
+                        const newW = Math.round(h / ratio);
+                        widthInput.value = newW;
+                    }
+                });
+            }
+
+            if (keepAspect) {
+                keepAspect.addEventListener('change', function () {
+                    if (keepAspect.checked) {
+                        updateRatio();
+                    }
+                });
+            }
+
+            const resizeToggle = document.getElementById('resize_toggle');
+            const keepAspectRow = document.querySelector('.keep-aspect-row');
+
+            function updateKeepAspectVisibility() {
+                if (!keepAspectRow) return;
+                if (resizeToggle && resizeToggle.checked) {
+                    keepAspectRow.style.display = 'grid';
+                } else {
+                    keepAspectRow.style.display = 'none';
+                }
+            }
+
+            updateKeepAspectVisibility();
+            if (resizeToggle) {
+                resizeToggle.addEventListener('change', updateKeepAspectVisibility);
+            }
+
+            const applyColor = document.getElementById('id_apply_color');
+            const colorModeRow = document.querySelector('.color-mode-row');
+
+            function updateColorVisibility() {
+                if (!colorModeRow) return;
+                if (applyColor && applyColor.checked) {
+                    colorModeRow.style.display = 'grid';
+                } else {
+                    colorModeRow.style.display = 'none';
+                }
+            }
+
+            updateColorVisibility();
+            if (applyColor) {
+                applyColor.addEventListener('change', updateColorVisibility);
+            }
+        });
+    </script>
+</body>
+</html>
