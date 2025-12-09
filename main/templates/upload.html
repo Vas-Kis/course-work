@@ -101,7 +101,7 @@
                     <span class="section-title">Зміна розміру:</span>
                     <div class="resize-inputs">
                         <label class="checkbox-label">
-                            <input type="checkbox" id="resize_toggle">
+                            {{ form.resize_enabled }}
                         </label>
 
                         <span class="resize-label">висота</span>
@@ -137,7 +137,9 @@
             <div class="controls-right">
                 <div class="download-block">
                     {% if pixel_url %}
-                        <a href="{{ pixel_url }}" class="btn-download" download>Завантажити</a>
+                        <a href="{% url 'download_pixel' pixel_download_name %}" class="btn-download">
+                            Завантажити
+                        </a>
                     {% else %}
                         <div class="btn-download btn-download-disabled">Завантажити</div>
                     {% endif %}
@@ -234,7 +236,7 @@
                 });
             }
 
-            const resizeToggle = document.getElementById('resize_toggle');
+            const resizeToggle = document.getElementById('id_resize_enabled');
             const keepAspectRow = document.querySelector('.keep-aspect-row');
 
             function updateKeepAspectVisibility() {

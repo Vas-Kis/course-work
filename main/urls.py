@@ -6,4 +6,5 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("hello/", views.hello_template, name="hello_template"),
     path("upload/", views.upload_file, name="upload_file"),
+    path("download/<str:filename>/", views.download_pixel, name="download_pixel"),
 ]

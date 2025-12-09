@@ -1,7 +1,8 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import render
 from django.core.files.storage import FileSystemStorage
 from PIL import Image, ImageOps
+import os
 
 from .forms import PixelArtForm
 
@@ -38,12 +39,12 @@ def apply_color_mode(img, mode: str):
         return img
 
 
-
 def upload_file(request):
     file_url = None
     pixel_url = None
     error_message = None
     current_file = None
+    pixel_download_name = None
 
     if request.method == "POST":
         form = PixelArtForm(request.POST, request.FILES)
@@ -63,7 +64,7 @@ def upload_file(request):
                 pixels = form.cleaned_data["pixels"]
                 scale = form.cleaned_data["scale"]
 
-                # НОВЕ: читаємо чекбокс та режим фільтра
+                resize_enabled = form.cleaned_data.get("resize_enabled", False)
                 apply_color = form.cleaned_data.get("apply_color", False)
                 color_mode = form.cleaned_data.get("color_mode") or "grayscale"
 
@@ -73,26 +74,18 @@ def upload_file(request):
 
                 img = Image.open(original_path).convert("RGB")
 
-                width, height = img.size
-                aspect = height / width if width else 1
-
-                small_width = pixels
-                small_height = max(1, int(pixels * aspect))
-
                 out_w = form.cleaned_data.get("output_width")
                 out_h = form.cleaned_data.get("output_height")
 
-                # resize ДО пікселізації
-                if out_w or out_h:
+                if resize_enabled and (out_w or out_h):
                     new_w = out_w if out_w else img.width
                     new_h = out_h if out_h else img.height
                     img = img.resize((new_w, new_h), Image.LANCZOS)
 
-                # НОВЕ: застосовуємо фільтр тільки якщо чекбокс увімкнений
                 if apply_color:
                     img = apply_color_mode(img, color_mode)
 
-                # далі – усе як раніше
+                # Пікселізація
                 width, height = img.size
                 aspect = height / width if width else 1
 
@@ -106,18 +99,11 @@ def upload_file(request):
                     Image.NEAREST,
                 )
 
-                out_w = form.cleaned_data.get("output_width")
-                out_h = form.cleaned_data.get("output_height")
-
-                if (out_w and out_w > 0) or (out_h and out_h > 0):
-                    new_w = out_w if out_w and out_w > 0 else pixel_img.width
-                    new_h = out_h if out_h and out_h > 0 else pixel_img.height
-                    pixel_img = pixel_img.resize((new_w, new_h), Image.NEAREST)
-
                 pixel_name = f"pixel_{original_name}"
                 pixel_path = storage.path(pixel_name)
                 pixel_img.save(pixel_path, format="PNG")
                 pixel_url = storage.url(pixel_name)
+                pixel_download_name = pixel_name
 
                 form = PixelArtForm(initial={
                     "pixels": pixels,
@@ -125,6 +111,7 @@ def upload_file(request):
                     "output_width": pixel_img.width,
                     "output_height": pixel_img.height,
                     "keep_aspect": form.cleaned_data.get("keep_aspect", True),
+                    "resize_enabled": resize_enabled,
                     "apply_color": apply_color,
                     "color_mode": color_mode,
                     "original_name": original_name,
@@ -140,4 +127,17 @@ def upload_file(request):
         "pixel_url": pixel_url,
         "current_file": current_file,
         "error_message": error_message,
+        "pixel_download_name": pixel_download_name,
     })
+
+def download_pixel(request, filename: str):
+    storage = FileSystemStorage()
+    if not storage.exists(filename):
+        raise Http404("Файл не знайдено")
+
+    pixel_path = storage.path(filename)
+    return FileResponse(
+        open(pixel_path, "rb"),
+        as_attachment=True,
+        filename=os.path.basename(filename),
+    )

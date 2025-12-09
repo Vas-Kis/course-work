@@ -49,14 +49,18 @@ class PixelArtForm(forms.Form):
         initial=True,
     )
 
-    # НОВЕ: чекбокс – чи застосовувати фільтр взагалі
+    resize_enabled = forms.BooleanField(
+        label="",
+        required=False,
+        initial=False,
+    )
+
     apply_color = forms.BooleanField(
         label="",
         required=False,
         initial=False,
     )
 
-    # НОВЕ: вибір самого фільтра
     color_mode = forms.ChoiceField(
         label="Кольорова гамма",
         choices=COLOR_CHOICES,
