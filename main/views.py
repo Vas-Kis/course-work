@@ -8,19 +8,7 @@ from .forms import PixelArtForm
 
 
 def home(request):
-    return HttpResponse("<h1>Привіт із Django!</h1><p>Це моя перша сторінка.</p>")
-
-
-def about(request):
-    return HttpResponse("<h1>Про проєкт</h1><p>Це простий офлайн-проєкт для знайомства з Django.</p>")
-
-
-def hello_template(request):
-    context = {
-        "name": "Василь",
-        "framework": "Django",
-    }
-    return render(request, "hello.html", context)
+    return render(request, "home.html")
 
 
 def apply_color_mode(img, mode: str):
@@ -58,7 +46,7 @@ def upload_file(request):
             if image_file:
                 original_name = storage.save(image_file.name, image_file)
 
-            if not original_name:
+            if not original_name or not storage.exists(original_name):
                 error_message = "Спочатку завантажте файл."
             else:
                 pixels = form.cleaned_data["pixels"]
@@ -85,7 +73,6 @@ def upload_file(request):
                 if apply_color:
                     img = apply_color_mode(img, color_mode)
 
-                # Пікселізація
                 width, height = img.size
                 aspect = height / width if width else 1
 
@@ -129,6 +116,7 @@ def upload_file(request):
         "error_message": error_message,
         "pixel_download_name": pixel_download_name,
     })
+
 
 def download_pixel(request, filename: str):
     storage = FileSystemStorage()
